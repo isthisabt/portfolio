@@ -1,0 +1,126 @@
+#Load required libraries
+library(httr)
+library(sentimentr)
+library(ggplot2)
+library(dplyr)
+
+###Define your API key###
+api_key <- "Enter_Youtube_API_Key_Here"
+
+###Define the YouTube video ID of the video you want to analyze###
+video_id <- "Enter_Video_ID_Here: usually its the part that comes after v= in the video url"
+
+###Set the maximum results per page. Increase the number based on computing power###
+max_results <- 1000
+
+##Create a function to fetch comments with pagination
+####We need pagination since youtube only allows access to 20 responses per API call###
+
+fetch_comments <- function(video_id, api_key, max_results, page_token = NULL) {
+  url <- paste0("https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=", video_id, 
+                "&maxResults=", max_results, "&key=", api_key)
+  if (!is.null(page_token)) {
+    url <- paste0(url, "&pageToken=", page_token)
+  }
+  response <- GET(url)
+  return(content(response))
+}
+
+###Fetch comments with pagination###
+all_comments <- list()
+next_page_token <- NULL
+repeat {
+  response <- fetch_comments(video_id, api_key, max_results, next_page_token)
+  all_comments <- c(all_comments, response$items)
+  if (is.null(response$nextPageToken)) {
+    break
+  }
+  next_page_token <- response$nextPageToken
+}
+
+###Extract the comments from the response###
+comment_text <- sapply(all_comments, function(x) x$snippet$topLevelComment$snippet$textOriginal)
+
+###Tokenise comments into sentences to clean up the data###
+sentences <- get_sentences(comment_text)
+
+view(sentences)
+
+###Check if there are any sentiments identified###
+view(sentences)
+
+####Calculate sentiment scores###
+sentiment_scores <- sentiment(sentences)
+
+###Calculate the average sentiment for each unique element_id, ignoring negative values lower than corresponding positive values###
+average_sentiment <- sentiment_scores %>%
+  group_by(element_id) %>%
+  summarize(average_sentiment = mean(ifelse(sentiment < 0 & any(sentiment > 0), NA, sentiment), na.rm = TRUE))
+
+###View the resulting data frame with the average sentiment for each unique sentence_id###
+print(average_sentiment)
+
+###Libraries for Ploting###
+library(dplyr)
+library(ggplot2)
+
+####Positive and Negative Scores###
+positive_values <- filter(average_sentiment, average_sentiment > 0)
+negative_values <- filter(average_sentiment, average_sentiment < 0)
+positive_average <- mean(positive_values$average_sentiment)
+negative_average <- mean(negative_values$average_sentiment)
+count_positive <- nrow(positive_values)
+count_negative <- nrow(negative_values)
+count_positive
+count_negative
+
+###Create a bar plot with color-coded bars###
+
+p <- ggplot(average_sentiment, aes(x = element_id, y = average_sentiment, fill = ifelse(average_sentiment >= 0, "Positive", "Negative"))) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("Positive" = "darkgreen", "Negative" = "darkred")) +
+  ggtitle("Average Sentiment per Element ID") +
+  xlab("Element ID") +
+  ylab("Average Sentiment")
+
+####Add annotations####
+p + 
+  annotate("text", x = 6, y = 3, label = paste("Number of Positive Responses: ", count_positive), color = "darkgreen", size = 4, hjust = 0) +
+  annotate("text", x = 6, y = 2.5, label = paste("Average of Positive Values: ", round(positive_average, 4)), color = "darkgreen", size = 4, hjust = 0) +
+  annotate("text", x = 6, y = 2, label = paste("Number of Negative Responses: ", count_negative), color = "darkred", size = 4, hjust = 0) +
+  annotate("text", x = 6, y = 1.5, label = paste("Average of Negative Values: ", round(negative_average, 4)), color = "darkred", size = 4, hjust = 0)
+
+#############################This next section is if you want export your datasets########################################################
+###################################Save as excel file for further analysis. Load the required library#####################################
+library(writexl)
+
+####################################Checking object type##########################
+view(negative_values)
+view(sentences)
+
+is.data.frame(sentences)
+typeof(sentences)
+class(sentences)
+str(sentences)
+
+is.data.frame(negative_values)
+typeof(negative_values)
+
+####Specify the path where you want to save the Excel file
+file_path <- "Enter/file/path/here/with/file_name.xlsx"
+
+###turn sentences into a dataframe
+sentences_df <- data.frame(comment_text = unlist(sentences), stringsAsFactors = FALSE)
+
+####Save the dataset as an Excel file
+write_xlsx(sentences_df, path = file_path)
+
+###repeat previous steps for negative_values
+file_path <- "Enter/file/path/here/with/file_name.xlsx"
+
+###turn sentences into a dataframe
+#sentences_df <- data.frame(comment_text = unlist(sentences), stringsAsFactors = FALSE)
+
+####Save the dataset as an Excel file
+write_xlsx(negative_values, path = file_path)
+
