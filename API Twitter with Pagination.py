@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 
 # Replace 'your_bearer_token' with your actual Bearer Token
-BEARER_TOKEN = 'AAAAAAAAAAAAAAAAAAAAAIfxdgEAAAAAt2%2F0Kfo%2F%2BWD9ZTtSCmkL9XJBXDE%3DRb2PoJvot4rOxyOXEcQT0JNwUQLTV1fETJut73oSi3giZf4etm'
+BEARER_TOKEN = 'hidden_token'
 
 # Twitter API endpoint for searching tweets
 SEARCH_URL = "https://api.twitter.com/2/tweets/search/recent"
@@ -63,3 +63,4 @@ def main():
 # Run the main function
 if __name__ == "__main__":
     main()
+
